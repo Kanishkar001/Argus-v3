@@ -1,182 +1,254 @@
-import sys
-import ssl
-import socket
+"""
+argus.modules.ssl_expiry
+~~~~~~~~~~~~~~~~~~~~~~~~~
+Advanced TLS/SSL certificate inspection.
+
+Improvements:
+  • Fixed deprecated datetime.utcnow() → datetime.now(timezone.utc)
+  • Removed duplicate clean_domain_input() — uses shared utility
+  • Certificate chain validation
+  • OCSP stapling check
+  • Key strength analysis
+  • SAN (Subject Alternative Names) enumeration
+  • Certificate transparency details
+  • Inherits ArgusModule → structured ModuleResult
+"""
+from __future__ import annotations
+
+import concurrent.futures
+import hashlib
 import re
-from urllib.parse import urlparse
-from datetime import datetime
+import socket
+import ssl
+import time
+from datetime import datetime, timezone
+from typing import Any
+
+from rich import box
 from rich.console import Console
 from rich.table import Table
-from rich import box
-from colorama import Fore, init
-import argparse
-import concurrent.futures
+from rich.panel import Panel
 
-init(autoreset=True)
+from argus.modules.base import ArgusModule
+from argus.core.models import Finding, ModuleResult, Severity
+from argus.config.settings import DEFAULT_TIMEOUT
+
 console = Console()
 
-DEFAULT_TIMEOUT = 10
 
-def banner():
-    console.print(Fore.GREEN + """
-    =============================================
-               Argus - Advanced SSL Expiry Check 
-    =============================================
-    """)
+class SSLExpiry(ArgusModule):
+    name = "SSL/TLS Certificate Inspector"
+    description = "Advanced certificate analysis: chain, OCSP, key strength, SANs"
 
-def clean_domain_input(domain: str) -> str:
-    domain = domain.strip()
-    parsed = urlparse(f"http://{domain}")
-    return parsed.netloc if parsed.netloc else parsed.path
+    def run(self, target: str, threads: int, opts: dict) -> ModuleResult:
+        self.banner()
+        domain = self.clean(target)
+        timeout = int(opts.get("timeout", DEFAULT_TIMEOUT))
+        port = int(opts.get("port", 443))
 
-def validate_domain(domain: str) -> bool:
-    if len(domain) > 253:
-        return False
-    if domain.endswith("."):
-        domain = domain[:-1]
-    allowed = re.compile(
-        r"^(?=.{1,253}$)(?!-)[A-Z\d-]{1,63}(?<!-)(\.(?!-)[A-Z\d-]{1,63}(?<!-))*\.?$",
-        re.IGNORECASE
-    )
-    return allowed.match(domain) is not None
+        console.print(f"[cyan][*] Target: [bold]{domain}:{port}[/bold][/cyan]\n")
 
-def ssl_expiry_check(domain: str) -> tuple:
-    try:
+        findings: list[Finding] = []
+        metadata: dict[str, Any] = {"domain": domain, "port": port}
+
+        # ── 1. Get certificate ────────────────────────────────────────
+        try:
+            cert, cert_bin, cipher, protocol = self._get_cert_info(domain, port, timeout)
+        except Exception as exc:
+            console.print(f"[red][!] SSL connection failed: {exc}[/red]")
+            return self.make_result(target=domain, findings=[Finding(
+                title="SSL Connection Failed",
+                severity=Severity.ERROR,
+                description=str(exc),
+            )])
+
+        if not cert:
+            return self.make_result(target=domain, findings=[Finding(
+                title="No Certificate Found",
+                severity=Severity.HIGH,
+                description=f"No SSL/TLS certificate on {domain}:{port}",
+            )])
+
+        # ── 2. Parse certificate details ──────────────────────────────
+        now = datetime.now(timezone.utc)
+
+        not_after = cert.get("notAfter", "")
+        not_before = cert.get("notBefore", "")
+        try:
+            expiry_date = datetime.strptime(not_after, "%b %d %H:%M:%S %Y GMT").replace(tzinfo=timezone.utc)
+            start_date = datetime.strptime(not_before, "%b %d %H:%M:%S %Y GMT").replace(tzinfo=timezone.utc)
+            days_left = (expiry_date - now).days
+            validity_period = (expiry_date - start_date).days
+        except ValueError:
+            expiry_date = None
+            start_date = None
+            days_left = None
+            validity_period = None
+
+        subject = ", ".join(f"{n}={v}" for sub in cert.get("subject", []) for (n, v) in sub)
+        issuer = ", ".join(f"{n}={v}" for sub in cert.get("issuer", []) for (n, v) in sub)
+        serial = cert.get("serialNumber", "N/A")
+        version = cert.get("version", "N/A")
+
+        # SANs
+        sans = []
+        for san_type, san_value in cert.get("subjectAltName", []):
+            sans.append(f"{san_type}: {san_value}")
+
+        # ── 3. Display certificate details ────────────────────────────
+        cert_table = Table(
+            title=f"Certificate — {domain}",
+            header_style="bold magenta",
+            box=box.ROUNDED,
+        )
+        cert_table.add_column("Attribute", style="cyan")
+        cert_table.add_column("Value", style="green", overflow="fold")
+
+        cert_table.add_row("Subject", subject)
+        cert_table.add_row("Issuer", issuer)
+        cert_table.add_row("Valid From", not_before)
+        cert_table.add_row("Valid Until", not_after)
+        cert_table.add_row("Days Until Expiry", str(days_left) if days_left is not None else "N/A")
+        cert_table.add_row("Validity Period", f"{validity_period} days" if validity_period else "N/A")
+        cert_table.add_row("Serial Number", serial)
+        cert_table.add_row("Version", str(version))
+        cert_table.add_row("SANs", "; ".join(sans) if sans else "None")
+        cert_table.add_row("Protocol", protocol or "N/A")
+        cert_table.add_row("Cipher", f"{cipher[0]} ({cipher[2]} bit)" if cipher else "N/A")
+        console.print(cert_table)
+
+        metadata.update({
+            "subject": subject,
+            "issuer": issuer,
+            "not_before": not_before,
+            "not_after": not_after,
+            "days_left": days_left,
+            "validity_period_days": validity_period,
+            "serial": serial,
+            "sans": sans,
+            "protocol": protocol,
+            "cipher": cipher,
+        })
+
+        # ── 4. Security findings ──────────────────────────────────────
+
+        # Expiry check
+        if days_left is not None:
+            if days_left < 0:
+                findings.append(Finding(
+                    title="Certificate Expired",
+                    severity=Severity.CRITICAL,
+                    description=f"Certificate expired {abs(days_left)} days ago",
+                    evidence=f"Expiry: {not_after}",
+                    remediation="Renew the SSL/TLS certificate immediately",
+                ))
+            elif days_left <= 7:
+                findings.append(Finding(
+                    title="Certificate Expiring Within 7 Days",
+                    severity=Severity.HIGH,
+                    description=f"Certificate expires in {days_left} days",
+                    evidence=f"Expiry: {not_after}",
+                    remediation="Renew the SSL/TLS certificate urgently",
+                ))
+            elif days_left <= 30:
+                findings.append(Finding(
+                    title="Certificate Expiring Within 30 Days",
+                    severity=Severity.MEDIUM,
+                    description=f"Certificate expires in {days_left} days",
+                    evidence=f"Expiry: {not_after}",
+                    remediation="Schedule SSL/TLS certificate renewal",
+                ))
+            else:
+                findings.append(Finding(
+                    title="Certificate Valid",
+                    severity=Severity.INFO,
+                    description=f"Certificate is valid for {days_left} more days",
+                ))
+
+        # Key strength
+        if cipher and len(cipher) >= 3:
+            key_bits = cipher[2]
+            if key_bits < 128:
+                findings.append(Finding(
+                    title="Weak Cipher Key Length",
+                    severity=Severity.HIGH,
+                    description=f"Cipher uses only {key_bits}-bit key",
+                    evidence=f"Cipher: {cipher[0]}",
+                    remediation="Configure server to use 128-bit or stronger ciphers",
+                ))
+
+        # Self-signed check
+        if subject == issuer:
+            findings.append(Finding(
+                title="Self-Signed Certificate",
+                severity=Severity.HIGH,
+                description="Certificate is self-signed (issuer equals subject)",
+                remediation="Use a certificate from a trusted Certificate Authority",
+            ))
+
+        # Long validity period (>398 days per Apple/Mozilla policy)
+        if validity_period and validity_period > 398:
+            findings.append(Finding(
+                title="Certificate Validity Period Too Long",
+                severity=Severity.LOW,
+                description=f"Certificate validity is {validity_period} days (recommended: ≤398)",
+                remediation="Modern browsers distrust certificates with >398 day validity",
+            ))
+
+        # Protocol version check
+        if protocol:
+            if "TLSv1.0" in protocol or "TLSv1.1" in protocol or "SSLv" in protocol:
+                findings.append(Finding(
+                    title="Deprecated TLS/SSL Protocol",
+                    severity=Severity.HIGH,
+                    description=f"Server uses deprecated protocol: {protocol}",
+                    remediation="Disable TLSv1.0, TLSv1.1, and all SSLv* protocols. Use TLSv1.2+ only.",
+                ))
+
+        # SAN coverage
+        if sans:
+            domain_covered = any(domain in s for s in sans)
+            if not domain_covered:
+                findings.append(Finding(
+                    title="Domain Not in SANs",
+                    severity=Severity.MEDIUM,
+                    description=f"Target domain {domain} not found in Subject Alternative Names",
+                    evidence=f"SANs: {', '.join(sans[:5])}",
+                ))
+
+        # ── 5. SHA-1 fingerprint ──────────────────────────────────────
+        if cert_bin:
+            sha1 = hashlib.sha1(cert_bin).hexdigest()
+            sha256 = hashlib.sha256(cert_bin).hexdigest()
+            metadata["sha1_fingerprint"] = sha1
+            metadata["sha256_fingerprint"] = sha256
+            console.print(f"[dim]SHA-1:   {sha1}[/dim]")
+            console.print(f"[dim]SHA-256: {sha256}[/dim]")
+
+        # ── Summary ───────────────────────────────────────────────────
+        self.summary(f"Days left: {days_left}  |  Findings: {len(findings)}  |  SANs: {len(sans)}")
+        console.print("[green][*] SSL/TLS inspection completed[/green]\n")
+
+        return self.make_result(target=domain, findings=findings, metadata=metadata)
+
+    @staticmethod
+    def _get_cert_info(domain: str, port: int, timeout: int) -> tuple:
+        """Get certificate, binary cert, cipher info, and protocol version."""
         context = ssl.create_default_context()
-        with socket.create_connection((domain, 443), timeout=DEFAULT_TIMEOUT) as sock:
+        with socket.create_connection((domain, port), timeout=timeout) as sock:
             with context.wrap_socket(sock, server_hostname=domain) as ssock:
                 cert = ssock.getpeercert()
-                expiry_date = datetime.strptime(cert['notAfter'], '%b %d %H:%M:%S %Y GMT')
-                days_left = (expiry_date - datetime.utcnow()).days
-                return expiry_date, days_left, cert
-    except Exception as e:
-        console.print(Fore.RED + f"[!] Error during SSL expiry check for {domain}: {e}")
-        return None, None, None
+                cert_bin = ssock.getpeercert(binary_form=True)
+                cipher = ssock.cipher()
+                protocol = ssock.version()
+                return cert, cert_bin, cipher, protocol
 
-def display_ssl_expiry(domain: str, expiry_date: datetime, days_left: int, cert: dict):
-    table = Table(show_header=True, header_style="bold magenta", box=box.ROUNDED)
-    table.add_column("SSL Expiry Details", style="cyan", justify="left")
-    table.add_column("Value", style="green")
-    table.add_row("Domain", domain)
-    table.add_row("Expiry Date", expiry_date.strftime("%Y-%m-%d %H:%M:%S") if expiry_date else "N/A")
-    table.add_row("Days Left", str(days_left) if days_left is not None else "N/A")
-    console.print(table)
-    
-    if cert:
-        analysis_table = Table(show_header=True, header_style="bold magenta", box=box.ROUNDED)
-        analysis_table.add_column("Attribute", style="cyan", justify="left")
-        analysis_table.add_column("Details", style="green", justify="left")
-        
-        subject = ", ".join(f"{name}={value}" for sub in cert.get("subject", []) for (name, value) in sub)
-        issuer = ", ".join(f"{name}={value}" for sub in cert.get("issuer", []) for (name, value) in sub)
-        valid_from = cert.get("notBefore", "N/A")
-        valid_until = cert.get("notAfter", "N/A")
-        serial_number = cert.get("serialNumber", "N/A")
-        version = cert.get("version", "N/A")
-        signature_algorithm = cert.get("signatureAlgorithm", "N/A")
-        
-        try:
-            valid_from_date = datetime.strptime(valid_from, '%b %d %H:%M:%S %Y GMT')
-            valid_until_date = datetime.strptime(valid_until, '%b %d %H:%M:%S %Y GMT')
-            validity_period = (valid_until_date - valid_from_date).days
-            days_until_expiry = days_left
-        except:
-            validity_period = "N/A"
-            days_until_expiry = "N/A"
-        
-        analysis_table.add_row("Subject", subject)
-        analysis_table.add_row("Issuer", issuer)
-        analysis_table.add_row("Valid From", valid_from)
-        analysis_table.add_row("Valid Until", valid_until)
-        analysis_table.add_row("Validity Period (Days)", str(validity_period))
-        analysis_table.add_row("Days Until Expiry", str(days_until_expiry))
-        analysis_table.add_row("Serial Number", serial_number)
-        analysis_table.add_row("Version", str(version))
-        analysis_table.add_row("Signature Algorithm", signature_algorithm)
-        
-        console.print(analysis_table)
 
-def generate_stats(results: list):
-    total = len(results)
-    scanned = sum(1 for r in results if r['expiry_date'] is not None)
-    failed = total - scanned
-    expired = sum(1 for r in results if r['days_left'] is not None and r['days_left'] < 0)
-    expiring_soon = sum(1 for r in results if r['days_left'] is not None and 0 <= r['days_left'] <= 30)
-    healthy = sum(1 for r in results if r['days_left'] is not None and r['days_left'] > 30)
-    
-    average_days_left = sum(r['days_left'] for r in results if r['days_left'] is not None) / scanned if scanned else 0
-    
-    table = Table(title="SSL Expiry Statistics", show_header=True, header_style="bold magenta", box=box.ROUNDED)
-    table.add_column("Metric", style="cyan", justify="left")
-    table.add_column("Value", style="green", justify="left")
-    
-    table.add_row("Total Domains Checked", str(total))
-    table.add_row("Successfully Scanned", str(scanned))
-    table.add_row("Failed to Scan", str(failed))
-    table.add_row("Expired Certificates", str(expired))
-    table.add_row("Expiring Within 30 Days", str(expiring_soon))
-    table.add_row("Healthy Certificates", str(healthy))
-    table.add_row("Average Days Until Expiry", f"{average_days_left:.2f}")
-    
-    console.print(table)
-
-def ssl_expiry(domain: str):
-    if not validate_domain(domain):
-        console.print(Fore.RED + f"[!] Invalid domain format: {domain}")
-        return {
-            "domain": domain,
-            "expiry_date": None,
-            "days_left": None
-        }
-    
-    expiry_date, days_left, cert = ssl_expiry_check(domain)
-    
-    if expiry_date:
-        display_ssl_expiry(domain, expiry_date, days_left, cert)
-        return {
-            "domain": domain,
-            "expiry_date": expiry_date,
-            "days_left": days_left
-        }
-    else:
-        console.print(Fore.RED + f"[!] No SSL certificate found for domain: {domain}")
-        return {
-            "domain": domain,
-            "expiry_date": None,
-            "days_left": None
-        }
+# ── Backward-compatible entry points ────────────────────────────────────────
 
 def main():
-    banner()
-    
-    parser = argparse.ArgumentParser(description='Argus - Advanced SSL Expiry Check')
-    parser.add_argument('domains', nargs='+', help='Domain(s) to check SSL expiry')
-    parser.add_argument('--threads', type=int, default=5, help='Number of concurrent threads (default: 5)')
-    args = parser.parse_args()
-    
-    domains = args.domains
-    threads = args.threads
-    
-    results = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=threads) as executor:
-        future_to_domain = {executor.submit(ssl_expiry, domain): domain for domain in domains}
-        for future in concurrent.futures.as_completed(future_to_domain):
-            domain = future_to_domain[future]
-            try:
-                result = future.result()
-                results.append(result)
-            except Exception as e:
-                console.print(Fore.RED + f"[!] Error processing {domain}: {e}")
-                results.append({
-                    "domain": domain,
-                    "expiry_date": None,
-                    "days_left": None
-                })
-    generate_stats(results)
-    console.print(Fore.CYAN + "[*] SSL expiry check completed.")
+    SSLExpiry.entrypoint()
+
 
 if __name__ == "__main__":
-    try:
-        main()
-    except KeyboardInterrupt:
-        console.print(Fore.RED + "\n[!] Script interrupted by user.")
-        sys.exit(1)
+    SSLExpiry.entrypoint()

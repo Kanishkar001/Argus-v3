@@ -12,6 +12,8 @@ Covers: exposed panels, default pages, path traversal, SSRF probes,
 from __future__ import annotations
 
 import re
+
+from argus.core.models import Finding as CoreFinding, ModuleResult, Severity
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -291,7 +293,7 @@ class NucleiLite(ArgusModule):
     name = "Nuclei Lite — CVE & Misconfiguration Scanner"
     description = "HTTP-based probe scanner for common vulns (no binary required)"
 
-    def run(self, target: str, threads: int, opts: dict) -> None:
+    def run(self, target: str, threads: int, opts: dict) -> ModuleResult:
         self.banner()
         domain   = self.clean(target)
         base_url = ensure_url_format(domain)
@@ -337,7 +339,7 @@ class NucleiLite(ArgusModule):
                 title="Result", style="green",
             ))
             self.summary(f"Probes: {len(PROBES)}")
-            return
+            return self.make_result(target=domain)
 
         # Results table
         table = Table(
@@ -379,6 +381,23 @@ class NucleiLite(ArgusModule):
 
         self.summary(f"Probes: {len(PROBES)}  |  Found: {len(findings)}")
         console.print("[green][*] Nuclei Lite scan complete[/green]\n")
+
+        # Convert internal Findings to core Findings for ModuleResult
+        sev_map = {
+            "CRITICAL": Severity.CRITICAL, "HIGH": Severity.HIGH,
+            "MEDIUM": Severity.MEDIUM, "LOW": Severity.LOW, "INFO": Severity.INFO,
+        }
+        core_findings = [
+            CoreFinding(
+                title=f.name,
+                severity=sev_map.get(f.severity, Severity.INFO),
+                description=f.description,
+                evidence=f.evidence,
+                metadata={"probe_id": f.id, "url": f.url},
+            )
+            for f in findings
+        ]
+        return self.make_result(target=domain, findings=core_findings)
 
 
 if __name__ == "__main__":
