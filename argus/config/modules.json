@@ -1319,6 +1319,23 @@
         "timeout",
         "threads"
       ]
+    },
+    {
+      "id": "139",
+      "name": "Nuclei Lite Scanner",
+      "script": "nuclei_lite.py",
+      "description": "HTTP-based CVE and misconfiguration scanner \u2014 30 probes, no binary required",
+      "primary_input": "domain",
+      "options": [
+        "timeout",
+        "threads",
+        "severity"
+      ],
+      "options_help": {
+        "timeout": "Per-probe timeout in seconds (default: 8)",
+        "threads": "Concurrent probe threads (default: 20)",
+        "severity": "Filter by severity: CRITICAL/HIGH/MEDIUM/LOW/INFO"
+      }
     }
   ],
   "run_all": [

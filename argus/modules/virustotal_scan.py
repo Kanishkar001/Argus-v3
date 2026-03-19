@@ -114,11 +114,11 @@ async def run_scans(targets, api_key):
 
 def main(targets):
     banner()
-    api_key = API_KEYS.get("VIRUSTOTAL_API_KEY")
+    api_key = API_KEYS.get("VIRUSTOTAL_API_KEY", "")
     if not api_key:
-        console.print(Fore.RED + "[!] VirusTotal API key is not set. Please set it in config/settings.py or as an environment variable.")
-        sys.exit(1)
-    
+        console.print(Fore.YELLOW + "[!] VirusTotal API key not set. Set VIRUSTOTAL_API_KEY env var to use this module.")
+        return
+
     cleaned_targets = []
     for target in targets:
         cleaned = clean_url(target)
@@ -126,13 +126,13 @@ def main(targets):
             cleaned_targets.append(cleaned)
         else:
             console.print(Fore.RED + f"[!] Invalid URL format: {target}")
-    
+
     if not cleaned_targets:
         console.print(Fore.RED + "[!] No valid URLs to scan.")
-        sys.exit(1)
+        return
 
     console.print(Fore.WHITE + f"[*] Initiating VirusTotal scans for {len(cleaned_targets)} URL(s)...")
-    
+
     asyncio.run(run_scans(cleaned_targets, api_key))
     console.print(Fore.CYAN + "[*] VirusTotal scan completed.")
 
@@ -142,10 +142,7 @@ if __name__ == "__main__":
             main(sys.argv[1:])
         except KeyboardInterrupt:
             console.print(Fore.RED + "\n[!] Process interrupted by user.")
-            sys.exit(1)
         except Exception as e:
             console.print(Fore.RED + f"\n[!] An unexpected error occurred: {e}")
-            sys.exit(1)
     else:
         console.print(Fore.RED + "[!] No target provided. Please pass one or more URLs.")
-        sys.exit(1)

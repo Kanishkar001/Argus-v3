@@ -17,6 +17,7 @@ _COMMAND_MODULES: List[str] = [
     ".export",    # NEW: export command
     ".history",   # NEW: history, stats, viewout, grepout
     ".web",       # NEW: web dashboard launcher
+    ".scan",      # NEW: all-in-one scan workflow
 ]
 
 __all__ = ["COMMAND_MIXINS", "register_mixins"]

@@ -25,6 +25,7 @@ from argus.utils.report_generator import (
     generate_base_filename,
     ensure_results_directory,
 )
+from argus.utils.html_report import generate_html_report
 from argus.utils.util import clean_domain_input
 from argus.config.settings import EXPORT_SETTINGS
 
@@ -38,7 +39,7 @@ class ExportMixin:
     _export_parser = argparse.ArgumentParser(description="Export last run results")
     _export_parser.add_argument(
         "fmt", nargs="?",
-        choices=["json", "csv", "txt", "all"],
+        choices=["json", "csv", "txt", "html", "all"],
         default="all",
         help="Output format (default: all enabled formats)",
     )
@@ -89,6 +90,10 @@ class ExportMixin:
         if fmt in ("json", "all") and (fmt == "json" or EXPORT_SETTINGS.get("enable_json_export", True)):
             generate_json_report(data, base, out_dir, self.target, modules)
             exported.append(f"{base}.json")
+
+        if fmt in ("html", "all") and (fmt == "html" or EXPORT_SETTINGS.get("enable_html_export", True)):
+            html_path = generate_html_report(data, domain, modules, out_dir)
+            exported.append(os.path.basename(html_path))
 
         if not exported:
             console.print("[yellow]No export formats enabled. Use 'export json/csv/txt' to force one.[/yellow]")

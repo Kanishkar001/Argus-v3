@@ -26,6 +26,7 @@ EXPORT_SETTINGS = {
     "enable_txt_export":  True,
     "enable_csv_export":  False,
     "enable_json_export": True,   # NEW: JSON export enabled by default
+    "enable_html_export": True,   # NEW: HTML report enabled by default
 }
 
 LOG_SETTINGS = {

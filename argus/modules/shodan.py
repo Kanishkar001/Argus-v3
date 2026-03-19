@@ -24,12 +24,9 @@ IP_PATTERN = re.compile(r"^(?:\d{1,3}\.){3}\d{1,3}$")
 MAX_CONCURRENT_REQUESTS = 5
 
 from argus.config.settings import API_KEYS
-from argus.utils.util import  resolve_to_ip  
+from argus.utils.util import resolve_to_ip
 
-SHODAN_API_KEY = API_KEYS.get("SHODAN_API_KEY")
-if not SHODAN_API_KEY:
-    console.print(Fore.RED + "[!] Shodan API key is not set. Please set it in config/settings.py.")
-    sys.exit(1)
+SHODAN_API_KEY = API_KEYS.get("SHODAN_API_KEY", "")
 
 def banner():
     console.print(Fore.GREEN + """
@@ -168,6 +165,9 @@ async def main_async(inputs):
     console.print(Fore.CYAN + "[*] Shodan Recon completed.")
 
 def main(inputs):
+    if not SHODAN_API_KEY:
+        console.print(Fore.YELLOW + "[!] Shodan API key not set. Set SHODAN_API_KEY env var to use this module.")
+        return
     try:
         asyncio.run(main_async(inputs))
     except KeyboardInterrupt:
