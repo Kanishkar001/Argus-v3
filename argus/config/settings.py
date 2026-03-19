@@ -1,66 +1,77 @@
 import os
-# config/settings.py
+from multiprocessing import cpu_count
+
+# ─── Argus v3.0 settings ────────────────────────────────────────────────────
+
+VERSION = "3.0"
+AUTHOR  = "Kanishkar"
 
 RESULTS_DIR = "results"
 
 DEFAULT_TIMEOUT = 10
 
-USER_AGENT = "Mozilla/5.0 (compatible; ArgusRecon/2.0)"
+USER_AGENT = "Mozilla/5.0 (compatible; ArgusRecon/3.0)"
 
 API_KEYS = {
     "VIRUSTOTAL_API_KEY": os.getenv("VIRUSTOTAL_API_KEY", ""),
-    "SHODAN_API_KEY": os.getenv("SHODAN_API_KEY", ""),
-    "GOOGLE_API_KEY": os.getenv("GOOGLE_API_KEY", ""),
-    "CENSYS_API_ID": os.getenv("CENSYS_API_ID", ""),
-    "CENSYS_API_SECRET": os.getenv("CENSYS_API_SECRET", ""),
-    "SSL_LABS_API_KEY": os.getenv("SSL_LABS_API_KEY", ""),
-    "HIBP_API_KEY": os.getenv("HIBP_API_KEY", ""),
+    "SHODAN_API_KEY":     os.getenv("SHODAN_API_KEY", ""),
+    "GOOGLE_API_KEY":     os.getenv("GOOGLE_API_KEY", ""),
+    "CENSYS_API_ID":      os.getenv("CENSYS_API_ID", ""),
+    "CENSYS_API_SECRET":  os.getenv("CENSYS_API_SECRET", ""),
+    "SSL_LABS_API_KEY":   os.getenv("SSL_LABS_API_KEY", ""),
+    "HIBP_API_KEY":       os.getenv("HIBP_API_KEY", ""),
 }
 
 EXPORT_SETTINGS = {
-    "enable_txt_export": True,
-    "enable_csv_export": False
+    "enable_txt_export":  True,
+    "enable_csv_export":  False,
+    "enable_json_export": True,   # NEW: JSON export enabled by default
 }
 
 LOG_SETTINGS = {
     "enable_logging": True,
-    "log_file": "argus.log",
-    "log_level": "INFO"
+    "log_file":       "argus.log",
+    "log_level":      "INFO",
 }
 
 HEADERS = {
-    "User-Agent": USER_AGENT,
-    "Accept-Language": "en-US,en;q=0.9"
+    "User-Agent":      USER_AGENT,
+    "Accept-Language": "en-US,en;q=0.9",
 }
 
-DEFAULT_THREADS = 1
-DEFAULT_MAX_PAGES = 100
-DEFAULT_WARN_MS = 3000
+DEFAULT_THREADS    = 1
+DEFAULT_MAX_PAGES  = 100
+DEFAULT_WARN_MS    = 3000
 DEFAULT_FULL_CHAIN = 0
-DEFAULT_QUIET = False
-DEFAULT_COLOR = True
+DEFAULT_QUIET      = False
+DEFAULT_COLOR      = True
 DEFAULT_WRAP_WIDTH = None
 
 PROFILE_DEFAULTS = {
     "speed": {
-        "max_pages": 50,
-        "warn_ms": 1000,
-        "full_chain": 0,
-        "threads_min": 2
+        "max_pages":    50,
+        "warn_ms":      1000,
+        "full_chain":   0,
+        "threads_min":  2,
     },
     "deep": {
-        "max_pages": 1000,
-        "warn_ms": 5000,
-        "full_chain": 1,
-        "threads_min": 5
+        "max_pages":    1000,
+        "warn_ms":      5000,
+        "full_chain":   1,
+        "threads_min":  5,
     },
     "safe": {
-        "max_pages": 25,
-        "warn_ms": 2000,
-        "full_chain": 0,
-        "threads_min": 1
-    }
+        "max_pages":    25,
+        "warn_ms":      2000,
+        "full_chain":   0,
+        "threads_min":  1,
+    },
 }
 
-from multiprocessing import cpu_count
+# Web dashboard settings
+WEB_HOST = os.getenv("ARGUS_WEB_HOST", "127.0.0.1")
+WEB_PORT = int(os.getenv("ARGUS_WEB_PORT", "7331"))
+WEB_DEBUG = os.getenv("ARGUS_WEB_DEBUG", "false").lower() == "true"
+
 DEFAULT_THREAD_CAP = min(32, cpu_count() * 5)
+

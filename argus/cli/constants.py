@@ -5,8 +5,8 @@ from ..core.catalog_cache import (
     SECTION_TOOL_NUMBERS,
 )
 
-VERSION = "2.0"
-AUTHOR = "Jason13"
+VERSION = "3.0"
+AUTHOR = "Kanishkar"
 TEAL = "#2EC4B6"
 CATALOG_FILENAME = "modules.json"
 ARGUS_CATALOG_ENV = "ARGUS_CATALOG_PATH"

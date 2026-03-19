@@ -14,6 +14,9 @@ _COMMAND_MODULES: List[str] = [
     ".favorites",
     ".utility",
     ".help",
+    ".export",    # NEW: export command
+    ".history",   # NEW: history, stats, viewout, grepout
+    ".web",       # NEW: web dashboard launcher
 ]
 
 __all__ = ["COMMAND_MIXINS", "register_mixins"]

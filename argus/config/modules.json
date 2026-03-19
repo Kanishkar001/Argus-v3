@@ -1271,6 +1271,54 @@
         "short_window"
       ],
       "script": "ip_reputation_trending.py"
+    },
+    {
+      "id": "135",
+      "name": "API Key Leakage Scanner",
+      "script": "api_key_leakage_scanner.py",
+      "description": "Scan HTML and JS files for exposed API keys, tokens, and secrets",
+      "primary_input": "domain",
+      "options": [
+        "timeout",
+        "depth"
+      ],
+      "options_help": {
+        "timeout": "Request timeout in seconds (default: 10)",
+        "depth": "JS file scan depth (default: 1)"
+      }
+    },
+    {
+      "id": "136",
+      "name": "CNAME Chain Analyzer",
+      "script": "cname_chain_analyzer.py",
+      "description": "Trace CNAME delegation chains and detect dangling/takeover risks",
+      "primary_input": "domain",
+      "options": [
+        "timeout",
+        "depth"
+      ]
+    },
+    {
+      "id": "137",
+      "name": "Email Spoofing Test",
+      "script": "email_spoofing_test.py",
+      "description": "Assess SPF/DMARC/DKIM configuration and email spoofing risk score",
+      "primary_input": "domain",
+      "options": [
+        "timeout"
+      ]
+    },
+    {
+      "id": "138",
+      "name": "Port Banner Grabber",
+      "script": "port_banner_grabber.py",
+      "description": "Grab service banners from open ports and identify risky services",
+      "primary_input": "domain",
+      "options": [
+        "ports",
+        "timeout",
+        "threads"
+      ]
     }
   ],
   "run_all": [
