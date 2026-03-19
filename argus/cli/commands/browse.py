@@ -58,26 +58,38 @@ class BrowseMixin:
     _search_parser.add_argument("--exact", action="store_true", help="exact match only")
     _search_parser.add_argument("--case-sensitive", action="store_true", help="case sensitive search")
 
+    _searchre_parser = argparse.ArgumentParser(description="Regex search modules")
+    _searchre_parser.add_argument("pattern", help="Regular expression")
+
     @with_argparser(_search_parser)
     @with_category("Module Browse")
     def do_search(self, args) -> None:
-        keyword = args.keyword
-        if args.case_sensitive:
+        keyword = args.keyword.strip()
+        if not args.case_sensitive:
             keyword = keyword.lower()
-        
-        if args.exact:
-            matches = [m for m in fuzzy_find_modules("") if keyword in m["name"].lower()]
-        else:
-            matches: List = fuzzy_find_modules(keyword)
         console = Console()
 
+        fuzzy_hits: List = fuzzy_find_modules(keyword)
+
+        if args.exact:
+            matches = [m for m in fuzzy_hits if keyword in m["name"].lower()]
+        else:
+            direct_hits = [
+                m for m in fuzzy_hits
+                if keyword in m["name"].lower()
+                or keyword in m.get("description", "").lower()
+                or any(keyword in t.lower() for t in m.get("tags", []))
+            ]
+            matches = direct_hits or fuzzy_hits
+
         console.print()
-        header = Text(f"Search: '{keyword}' ", justify="center", style=f"bold white on {TEAL}")
+        header = Text(f"Search: '{args.keyword}' ", justify="center",
+                      style=f"bold white on {TEAL}")
         console.print(Panel(header, expand=False, padding=(0, 2), style=TEAL))
         console.print()
 
         if not matches:
-            console.print(f":mag_right: No modules matched '{keyword}'", style="bold red")
+            console.print(f":mag_right: No modules matched '{args.keyword}'", style="bold red")
             console.print()
             self._print_status_bar()
             return
@@ -88,91 +100,33 @@ class BrowseMixin:
             self._print_status_bar()
             return
 
-        id_width = max(len(tool['number']) for tool in matches) + 2
-        name_width = max(len(tool['name']) for tool in matches) + 2
+        id_w   = max(len(t["number"]) for t in matches) + 2
+        name_w = max(len(t["name"])   for t in matches) + 2
 
         cols = Text()
-        cols.append("No.".ljust(4), style=f"bold {TEAL}")
-        cols.append("ID".ljust(id_width), style="bold white")
-        cols.append("Name".ljust(name_width), style="bold white")
-        cols.append("Section", style=f"bold {SECTION_COLOR}")
+        cols.append("No.".ljust(4),       style=f"bold {TEAL}")
+        cols.append("ID".ljust(id_w),     style="bold white")
+        cols.append("Name".ljust(name_w), style="bold white")
+        cols.append("Section",            style=f"bold {SECTION_COLOR}")
         console.print(cols)
         console.print()
 
         for idx, tool in enumerate(matches, 1):
-            line = Text()
-            line.append(f"{idx}.".ljust(4), style=f"bold {TEAL}")
-            line.append(tool['number'].ljust(id_width), style="white")
-            line.append(tool['name'].ljust(name_width), style="white")
-            line.append(tool['section'], style=SECTION_COLOR)
-            console.print(line)
+            row = Text()
+            row.append(f"{idx}.".ljust(4),           style=f"bold {TEAL}")
+            row.append(tool["number"].ljust(id_w),   style="white")
+            row.append(tool["name"].ljust(name_w),   style="white")
+            row.append(tool["section"],               style=SECTION_COLOR)
+            console.print(row)
 
         console.print()
-        console.print(Text(" Use '<No.>' or '<ID>' with 'use' to select ", style=f"bold white on {TEAL}"))
+        console.print(Text(" Use '<No.>' or '<ID>' with 'use' to select ",
+                           style=f"bold white on {TEAL}"))
         console.print()
 
         self.last_search_results = matches
         self._print_status_bar()
 
-    _searchre_parser = argparse.ArgumentParser(description="Regex search modules")
-    _searchre_parser.add_argument("pattern", help="Regular expression")
-
-    @with_argparser(_search_parser)
-    @with_category("Module Browse")
-    def do_search(self, args) -> None:
-        keyword = args.keyword.strip().lower()
-        console = Console()
-
-        fuzzy_hits: List = fuzzy_find_modules(keyword)
-
-        direct_hits = [
-            m for m in fuzzy_hits
-            if keyword in m["name"].lower()
-            or keyword in m.get("description","").lower()
-            or any(keyword in t.lower() for t in m.get("tags", []))
-        ]
-        matches = direct_hits or fuzzy_hits
-
-        console.print()
-        header = Text(f"Search: '{args.keyword}' ", justify="center",
-                    style=f"bold white on {TEAL}")
-        console.print(Panel(header, expand=False, padding=(0, 2), style=TEAL))
-        console.print()
-
-        if not matches:
-            console.print(f":mag_right: No modules matched '{args.keyword}'",
-                        style="bold red")
-            console.print()
-            self._print_status_bar()
-            return
-
-        if len(matches) == 1:
-            self._show_help_tool(matches[0])
-            console.print()
-            self._print_status_bar()
-            return
-
-        id_w   = max(len(t["number"]) for t in matches) + 2
-        name_w = max(len(t["name"])   for t in matches) + 2
-
-        cols = Text()
-        cols.append("No.".ljust(4),             style=f"bold {TEAL}")
-        cols.append("ID".ljust(id_w),           style="bold white")
-        cols.append("Name".ljust(name_w),       style="bold white")
-        cols.append("Section",                  style=f"bold {SECTION_COLOR}")
-        console.print(cols); console.print()
-
-        for idx, tool in enumerate(matches, 1):
-            row = Text()
-            row.append(f"{idx}.".ljust(4),      style=f"bold {TEAL}")
-            row.append(tool["number"].ljust(id_w), style="white")
-            row.append(tool["name"].ljust(name_w), style="white")
-            row.append(tool["section"],            style=SECTION_COLOR)
-            console.print(row)
-
-        console.print()
-        console.print(Text(" Use '<No.>' or '<ID>' with 'use' to select ",
-                        style=f"bold white on {TEAL}"))
         console.print()
 
         self.last_search_results = matches
