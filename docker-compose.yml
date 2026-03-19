@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  argus:
+    build: .
+    container_name: argus-recon
+    image: argus-recon:latest
+    volumes:
+      # Mount results directory for persistent output
+      - ./results:/app/results
+      # Mount config directory for custom configuration
+      - ./config:/app/config
+      # Mount logs directory for debugging
+      - ./logs:/app/logs
+    environment:
+      # Set environment variables for API keys
+      - VIRUSTOTAL_API_KEY=${VIRUSTOTAL_API_KEY:-}
+      - SHODAN_API_KEY=${SHODAN_API_KEY:-}
+      - CENSYS_API_ID=${CENSYS_API_ID:-}
+      - CENSYS_API_SECRET=${CENSYS_API_SECRET:-}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - HIBP_API_KEY=${HIBP_API_KEY:-}
+      # Python environment
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+    # Run in interactive mode for CLI usage
+    stdin_open: true
+    tty: true
+    # Use host network for better network access
+    network_mode: host
+    # Restart policy
+    restart: unless-stopped
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+    # Health check
+    healthcheck:
+      test: ["CMD", "python", "-c", "import argus; print('Argus is healthy')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+
