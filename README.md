@@ -248,11 +248,11 @@ Edit `config/settings.py` to customize:
 
 ## 🔄 Changelog
 
-### Version 2.0 (Current)
+### Version 3.0 (Current)
 **Major refactor: Complete CLI redesign and module expansion**
 
 - **New interactive CLI** - Full command-line interface with 25+ commands
-- **135 modules** - Expanded from 50 modules
+- **135+ modules** - Expanded from 50 modules
 - **Better UI** - Professional formatting and progress tracking
 - **Multi-threading** - Improved performance with concurrent execution
 - **API integrations** - Shodan, VirusTotal, Censys, SSL Labs support
