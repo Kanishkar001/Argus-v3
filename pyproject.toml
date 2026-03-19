@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "argus-recon"
-version = "2.0"
+version = "3.0"
 description = "Toolkit for information gathering & reconnaissance."
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -37,6 +37,7 @@ dependencies = [
   "python-slugify>=8,<9",
   "mmh3>=4,<5",
   "idna>=3,<4",
+  "flask>=3.0",
 ]
 
 [project.optional-dependencies]
