@@ -14,30 +14,31 @@ from enum import Enum
 from typing import Any
 
 
+# Put this BEFORE the class definition
+_SEVERITY_ORDER = {
+    "CRITICAL": 1,
+    "HIGH":     2,
+    "MEDIUM":   3,
+    "LOW":      4,
+    "INFO":     5,
+    "ERROR":    6,
+}
+
 class Severity(str, Enum):
     """Standardised severity labels, ordered most → least severe."""
     CRITICAL = "CRITICAL"
-    HIGH = "HIGH"
-    MEDIUM = "MEDIUM"
-    LOW = "LOW"
-    INFO = "INFO"
-    ERROR = "ERROR"  # module-level execution failure
+    HIGH     = "HIGH"
+    MEDIUM   = "MEDIUM"
+    LOW      = "LOW"
+    INFO     = "INFO"
+    ERROR    = "ERROR"
 
     # allow comparison / sorting
-    _ORDER = {
-        "CRITICAL": 0,
-        "HIGH": 1,
-        "MEDIUM": 2,
-        "LOW": 3,
-        "INFO": 4,
-        "ERROR": 5,
-    }
-
     def __lt__(self, other: "Severity") -> bool:
-        return self._ORDER.get(self.value, 99) < self._ORDER.get(other.value, 99)
+        return _SEVERITY_ORDER.get(self.value, 99) < _SEVERITY_ORDER.get(other.value, 99)
 
     def __le__(self, other: "Severity") -> bool:
-        return self._ORDER.get(self.value, 99) <= self._ORDER.get(other.value, 99)
+        return _SEVERITY_ORDER.get(self.value, 99) <= _SEVERITY_ORDER.get(other.value, 99)
 
 
 @dataclass

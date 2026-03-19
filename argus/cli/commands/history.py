@@ -19,10 +19,12 @@ __mixin_name__ = "HistoryMixin"
 
 TEAL   = "#2EC4B6"
 SEV_STYLE = {
-    "ALERT": "bold red",
-    "WARN":  "bold yellow",
-    "OK":    "bold green",
-    "INFO":  "dim white",
+    "CRITICAL": "bold red",
+    "HIGH":     "bold red",
+    "MEDIUM":   "bold yellow",
+    "LOW":      "yellow",
+    "INFO":     "dim white",
+    "ERROR":    "bold magenta",
 }
 console = Console()
 
@@ -43,7 +45,7 @@ class HistoryMixin:
         help="Number of recent modules to show (default 10)",
     )
     _history_parser.add_argument(
-        "--severity", choices=["ALERT", "WARN", "OK", "INFO"],
+        "--severity", choices=["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO", "ERROR"],
         help="Filter by severity level",
     )
 
@@ -95,7 +97,7 @@ class HistoryMixin:
 
         total_time  = sum(r[2] for r in runtimes)
         severities  = [r[1] for r in runtimes]
-        sev_counts  = {s: severities.count(s) for s in ("ALERT", "WARN", "OK", "INFO")}
+        sev_counts  = {s: severities.count(s) for s in ("CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO", "ERROR")}
         slowest     = max(runtimes, key=lambda r: r[2])
         fastest     = min(runtimes, key=lambda r: r[2])
         total_lines = sum(len(o.splitlines()) for o in outputs.values())
