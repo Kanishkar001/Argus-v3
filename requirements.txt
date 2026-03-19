@@ -1,0 +1,47 @@
+# Core HTTP and Networking
+aiohttp>=3.8.0
+requests>=2.28.0
+urllib3>=1.26.0
+aioquic>=0.9.0
+
+# CLI and User Interface
+cmd2>=2.4.0
+rich>=12.0.0
+colorama>=0.4.5
+tabulate>=0.8.10
+
+# DNS and Network Analysis
+dnspython>=2.2.0
+pysnmp>=4.4.12
+paramiko>=2.11.0
+
+# Web Scraping and Parsing
+beautifulsoup4>=4.11.0
+lxml>=4.9.0
+
+# Security and Cryptography
+pyOpenSSL>=22.0.0
+PyJWT>=2.6.0
+cryptography>=37.0.0
+
+# Data Processing and Utilities
+Jinja2>=3.1.0
+python-slugify>=6.1.0
+packaging>=21.3
+idna>=3.4
+mmh3>=3.0.0
+
+# Additional Security Tools
+jarm
+ldap3>=2.9.0
+
+# Development and Testing (optional)
+pytest>=7.0.0
+pytest-cov>=4.0.0
+black>=22.0.0
+flake8>=5.0.0
+bandit>=1.7.0
+
+# Documentation
+sphinx>=5.0.0
+sphinx-rtd-theme>=1.0.0

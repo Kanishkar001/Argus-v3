@@ -1,0 +1,6 @@
+include README.md
+include LICENSE
+recursive-include argus/config *.json
+recursive-include argus/templates *.j2
+recursive-include argus/data *
+include argus/py.typed

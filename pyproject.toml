@@ -1,0 +1,64 @@
+[build-system]
+requires = ["setuptools>=70", "wheel", "build"]
+build-backend = "setuptools.build_meta"
+
+
+[project]
+name = "argus-recon"
+version = "2.0"
+description = "Toolkit for information gathering & reconnaissance."
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [{ name = "Jasonxtn", email = "xtnjason@gmail.com" }]
+requires-python = ">=3.10"
+keywords = ["recon", "security", "osint", "networking", "dns", "http", "cli"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "License :: OSI Approved :: MIT License",
+  "Environment :: Console",
+  "Topic :: Security",
+  "Intended Audience :: Information Technology",
+  "Typing :: Typed"
+]
+
+dependencies = [
+  "requests>=2.32,<3",
+  "urllib3>=2,<3",
+  "rich>=13,<14",
+  "dnspython>=2.6,<3",
+  "paramiko>=3,<4",
+  "beautifulsoup4>=4.12,<5",
+  "lxml>=5,<6",
+  "Jinja2>=3.1,<4",
+  "packaging>=24,<25",
+  "python-slugify>=8,<9",
+  "mmh3>=4,<5",
+  "idna>=3,<4",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8",
+  "ruff>=0.6",
+  "mypy>=1.11",
+  "build>=1.2",
+  "twine>=5",
+]
+
+[project.scripts]
+argus = "argus.cli.main:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["argus", "argus.*"]
+
+[tool.setuptools.package-data]
+argus = [
+  "config/*.json",
+  "templates/**/*.j2",
+  "data/**/*",
+  "py.typed",
+]
